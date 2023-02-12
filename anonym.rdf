@@ -1,0 +1,20 @@
+xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+   xmlns:ns1="http://anonym-url.anon/Namespace4#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+>
+  <rdf:Description rdf:about="http://anonym-url.anon/Namespace4/Subject1">
+    <ns1:Predicate4>Object7</ns1:Predicate4>
+    <ns1:Predicate0>Object5</ns1:Predicate0>
+    <ns1:Predicate2>Object2</ns1:Predicate2>
+    <ns1:Predicate3>Object3</ns1:Predicate3>
+    <ns1:Predicate1>Object9</ns1:Predicate1>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://anonym-url.anon/Namespace4/Subject0">
+    <ns1:Predicate0>Object0</ns1:Predicate0>
+    <ns1:Predicate4>Object8</ns1:Predicate4>
+    <ns1:Predicate3>Object4</ns1:Predicate3>
+    <ns1:Predicate2>Object6</ns1:Predicate2>
+    <ns1:Predicate1>Object1</ns1:Predicate1>
+  </rdf:Description>
+</rdf:RD

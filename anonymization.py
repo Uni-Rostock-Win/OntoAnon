@@ -1,7 +1,7 @@
 from tkinter import messagebox
 
 import rdflib
-from rdflib import Graph, Literal, URIRef
+from rdflib import Graph, Literal, URIRef, BNode
 from rdflib.namespace import Namespace
 
 
@@ -36,19 +36,20 @@ def anonymize(filename, fileformat, anony_path, dict_path):
 
     # translate the predicates
     predicat_translator = []
-    predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, all_ns)
+    predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, subject_translator, all_ns)
     translator.extend(predicat_translator)
 
     # translate the objects
     object_translator = []
-    object_to_generic_object(objects, object_translator, namespace_translator,all_ns)
+    object_to_generic_object(objects, object_translator, namespace_translator, subject_translator, predicat_translator, all_ns)
     translator.extend(object_translator)
 
     # Replaces the subjects, predicates and objects in the graph with the anonymized elements
     change_graph(g,subject_translator,predicat_translator,object_translator)
 
     # Saving the anonymized graph to the selected file
-    new_graph = g.serialize(format=fileformat)
+    #new_graph = g.serialize(format=fileformat)
+    new_graph = g.serialize(format='xml')
 
     with open(anony_path, 'w') as fp:
         fp.write(new_graph)
@@ -88,14 +89,14 @@ def identify_elements(g):
     objects = list(dict.fromkeys(objects))
 
     # controll results while development
-    # print('namespaces: ')
-    # print(namespaces)
-    # print('subjects: ')
-    # print(subjects)
-    # print('predicates: ')
-    # print(predicates)
-    # print('objects: ')
-    # print(objects)
+    #print('namespaces: ')
+    #print(namespaces)
+    #print('subjects: ')
+    #print(subjects)
+    #print('predicates: ')
+    #print(predicates)
+    #print('objects: ')
+    #print(objects)
     return namespaces, objects, predicates, subjects
 
 # translates the namespaces to generic namespaces
@@ -137,6 +138,7 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
 
         # check if subject contains an URIRef, if not translate it as normal Literal
         if ('http' in subj_element) and (standard_ns == False):
+
             # check if URIRef is a known namespace
             is_namespace = False
             namespace_count = 0
@@ -163,7 +165,7 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
         standard_ns = False
 
 # translates the predicates to generic predicates
-def predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, all_ns):
+def predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, subject_translator, all_ns):
     predicat_counter = 0
     standard_ns = False
     for pred_element in predicates:
@@ -186,8 +188,20 @@ def predicat_to_generic_predicat(predicates, predicat_translator, namespace_tran
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
             if is_namespace == True:
-                new_string = str(namespace_translator[namespace_count][1][1] + 'Predicate' + str(predicat_counter))
-                predicat_translator.append([pred_element, URIRef(new_string)])
+
+                # check if URI is known subject
+                is_subject = False
+                subject_value = ''
+                for element in subject_translator:
+                    if pred_element == element[0]:
+                        is_subject = True
+                        subject_value = element[1]
+
+                if is_subject == True:
+                    predicat_translator.append([pred_element, URIRef(subject_value)])
+                else:
+                    new_string = str(namespace_translator[namespace_count][1][1] + 'Predicate' + str(predicat_counter))
+                    predicat_translator.append([pred_element, URIRef(new_string)])
             else:
                 if '#' in pred_element:
                     predicat_translator.append([pred_element, URIRef("http://anonym-pred-url.anon#Predicate" + str(predicat_counter))])
@@ -200,14 +214,17 @@ def predicat_to_generic_predicat(predicates, predicat_translator, namespace_tran
         standard_ns = False
 
 # translates the objects to generic objects
-def object_to_generic_object(objects, object_translator, namespace_translator,all_ns):
+def object_to_generic_object(objects, object_translator, namespace_translator, subject_translator, predicat_translator, all_ns):
     object_counter = 0
-    standard_ns = False
+
     for obj_element in objects:
+        # check if namespace standard namespace
+        standard_ns = False
         for ns in all_ns:
             if (URIRef(obj_element) in Namespace(ns)) :
                 standard_ns = True
                 object_translator.append([obj_element, obj_element])
+                break
 
         if ('http' in obj_element) and (standard_ns == False):
 
@@ -215,24 +232,47 @@ def object_to_generic_object(objects, object_translator, namespace_translator,al
             is_namespace = False
             namespace_count = 0
             for element in namespace_translator:
-                if element[0][1][:-1] in obj_element:
+                if URIRef(obj_element) in Namespace(element[0][1]):
                     is_namespace = True
-                    is_namespace = False
                     break
                 namespace_count = namespace_count +1
 
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
             if is_namespace == True:
-                new_string = str(namespace_translator[namespace_count][1][1] + 'Object' + str(object_counter))
-                object_translator.append([obj_element, URIRef(new_string)])
+
+                # check if URI is known subject
+                is_subject = False
+                subject_value = ''
+                for element in subject_translator:
+                    if obj_element == element[0]:
+                        is_subject = True
+                        subject_value = element[1]
+
+                # check if URI is known subject
+                is_predicat = False
+                predicate_value = ''
+                for element in predicat_translator:
+                    if obj_element == element[0]:
+                        is_predicat = True
+                        is_subject = False
+                        subject_value = element[1]
+
+                if is_subject == True:
+                    object_translator.append([obj_element, URIRef(subject_value)])
+                elif is_predicat == True:
+                    object_translator.append([obj_element, URIRef(predicate_value)])
+                else:
+                    new_string = str(namespace_translator[namespace_count][1][1] + 'Object' + str(object_counter))
+                    object_translator.append([obj_element, URIRef(new_string)])
             else:
                 if '#' in obj_element:
                     object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon#Object" + str(object_counter))])
                 else:
                     object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon/Object" + str(object_counter))])
         elif standard_ns == False:
-                object_translator.append([obj_element, Literal("Object" + str(object_counter))])
+            object_translator.append([obj_element, Literal("Object" + str(object_counter))])
+
         object_counter = object_counter + 1
 
         standard_ns = False

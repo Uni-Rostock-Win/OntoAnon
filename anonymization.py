@@ -159,7 +159,10 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
                 else:
                     subject_translator.append([subj_element, URIRef("http://anonym-subj-url.anon/Subject" + str(subj_counter))])
         elif standard_ns == False:
-            subject_translator.append([subj_element, Literal("Subject" + str(subj_counter))])
+            if '_:' in subj_element.n3():
+                subject_translator.append([subj_element, BNode(subj_element)])
+            else:
+                subject_translator.append([subj_element, Literal("Subject" + str(subj_counter))])
         subj_counter = subj_counter + 1
 
         standard_ns = False
@@ -256,7 +259,7 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
                     if obj_element == element[0]:
                         is_predicat = True
                         is_subject = False
-                        subject_value = element[1]
+                        predicate_value = element[1]
 
                 if is_subject == True:
                     object_translator.append([obj_element, URIRef(subject_value)])
@@ -271,7 +274,12 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
                 else:
                     object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon/Object" + str(object_counter))])
         elif standard_ns == False:
-            object_translator.append([obj_element, Literal("Object" + str(object_counter))])
+            if '"' in obj_element.n3() and '<' in obj_element.n3():
+                object_translator.append([obj_element, obj_element])
+            elif '_:' in obj_element.n3():
+                object_translator.append([obj_element, BNode(obj_element)])
+            else:
+                object_translator.append([obj_element, Literal("Object" + str(object_counter))])
 
         object_counter = object_counter + 1
 

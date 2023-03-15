@@ -55,8 +55,12 @@ def anonymize(filename, fileformat, anony_path, dict_path):
         fp.write(new_graph)
 
     # Saves the translation dictionary
+    outputTranslator = ""
+    for item in translator:
+        if type(item[0]) == rdflib.term.BNode or item[0] == item: continue
+        else: outputTranslator += ("\n" + str(item[0]) + " => " + str(item[1]))
     with open(dict_path, 'w') as fp:
-        fp.write("\n".join(str(item) for item in translator))
+        fp.write(outputTranslator)
 
     # Showing a message that the process is finished.
     messagebox.showinfo("System-Message", "Anonymization is finished.")
@@ -162,7 +166,7 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
             if '_:' in subj_element.n3():
                 subject_translator.append([subj_element, BNode(subj_element)])
             else:
-                subject_translator.append([subj_element, Literal("Subject" + str(subj_counter))])
+                subject_translator.append([subj_element, Literal("Subject" + str(subj_counter), datatype=subj_element.datatype, lang=subj_element.language)])
         subj_counter = subj_counter + 1
 
         standard_ns = False
@@ -274,13 +278,20 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
                 else:
                     object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon/Object" + str(object_counter))])
         elif standard_ns == False:
-            if '"' in obj_element.n3() and '<' in obj_element.n3():
-                object_translator.append([obj_element, obj_element])
-            elif '_:' in obj_element.n3():
+            if '"' in obj_element.n3() and '<' in obj_element.n3() and type(obj_element) != rdflib.Literal:
+                print("test")
+            if type(obj_element) == rdflib.Literal:
+                if(obj_element.isdigit()):
+                    object_translator.append([obj_element, obj_element])
+                else: 
+                    object_translator.append([obj_element, Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)])
+            #     object_translator.append([obj_element, obj_element])
+            elif type(obj_element) == rdflib.BNode:
                 object_translator.append([obj_element, BNode(obj_element)])
             else:
-                object_translator.append([obj_element, Literal("Object" + str(object_counter))])
-
+                object_translator.append([obj_element, obj_element])
+        elif standard_ns == True and type(obj_element) == rdflib.term.Literal:
+            object_translator.append([obj_element, Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)])
         object_counter = object_counter + 1
 
         standard_ns = False

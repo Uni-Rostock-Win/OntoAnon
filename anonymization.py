@@ -24,30 +24,28 @@ def anonymize(filename, fileformat, anony_path, dict_path):
     # identifing the different elements in the ontology
     namespaces, objects, predicates, subjects = identify_elements(g)
 
-    translator = []
+    translator = {}
 
     # translate the namespaces
     namespace_translator = []
     namespace_to_generic_namespace(namespaces, namespace_translator, all_ns)
-    translator.extend(namespace_translator)
+    translator.update({element[0][1]:element[1][1] for element in namespace_translator})
 
     # translate the subjects
-    subject_translator = []
-    subject_to_generic_subject(subjects, subject_translator, namespace_translator, all_ns)
-    translator.extend(subject_translator)
+
+    subject_translator = subject_to_generic_subject(subjects, namespace_translator, all_ns)
+    translator.update(subject_translator)
 
     # translate the predicates
-    predicat_translator = []
-    predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, subject_translator, all_ns)
-    translator.extend(predicat_translator)
+    predicat_translator = predicate_to_generic_predicat(predicates, namespace_translator, subject_translator, all_ns)
+    translator.update(predicat_translator)
 
     # translate the objects
-    object_translator = []
-    object_to_generic_object(objects, object_translator, namespace_translator, subject_translator, predicat_translator, all_ns)
-    translator.extend(object_translator)
+    object_translator = object_to_generic_object(objects, namespace_translator, subject_translator, predicat_translator, all_ns)
+    translator.update(object_translator)
 
     # Replaces the subjects, predicates and objects in the graph with the anonymized elements
-    g = change_graph(g,subject_translator,predicat_translator,object_translator)
+    g = change_graph(g, subject_translator, predicat_translator, object_translator)
 
     # Saving the anonymized graph to the selected file
     #new_graph = g.serialize(format=fileformat)
@@ -58,10 +56,9 @@ def anonymize(filename, fileformat, anony_path, dict_path):
 
     # Saves the translation dictionary
     outputTranslator = ""
-    for item in translator:
-        if type(item[0]) == rdflib.term.BNode or item[0] == item: continue
-        else: outputTranslator += ("\n" + str(item[0]) + " => " + str(item[1]))
-    with open(dict_path, 'w') as fp:
+    for k,v in translator.items():
+        outputTranslator += ("\n" + str(k) + " => " + str(v))
+    with open(dict_path, 'w', encoding="utf-8") as fp:
         fp.write(outputTranslator)
     end_time = time.time()
     execution_time = int(end_time - start_time)
@@ -134,7 +131,18 @@ def namespace_to_generic_namespace(namespaces, translator, all_ns):
         standard_ns = False
 
 # translates the subjects to generic subjects
-def subject_to_generic_subject(subjects, subject_translator, namespace_translator, all_ns):
+def subject_to_generic_subject(subjects:list, namespace_translator:list, all_ns:list):
+    """Translates a list of subjects
+
+    Args:
+        subjects (list): The subjects (list of URIRefs) to be translated
+        namespace_translator (list): The already translated namespaces
+        all_ns (list): The list of standard-Namespaces
+
+    Returns:
+        dict: key value pair for original and translated values
+    """
+    subject_translator = {}
     subj_counter = 0
     standard_ns = False
     for subj_element in subjects:
@@ -142,10 +150,11 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
         for ns in all_ns:
             if (URIRef(subj_element) in Namespace(ns)) :
                 standard_ns = True
-                subject_translator.append([subj_element, subj_element])
-
+                subject_translator.update({subj_element: subj_element})
+            protocol = "http://" if ('http' in subj_element) else ""
+            protocol = "urn:" if ('urn:' in subj_element) else protocol
         # check if subject contains an URIRef, if not translate it as normal Literal
-        if ('http' in subj_element) and (standard_ns == False):
+        if protocol != "" and (standard_ns == False):
 
             # check if URIRef is a known namespace
             is_namespace = False
@@ -158,25 +167,26 @@ def subject_to_generic_subject(subjects, subject_translator, namespace_translato
 
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
-            if is_namespace == True:
+            if is_namespace:
                 new_string = str(namespace_translator[namespace_count][1][1] + 'Subject' + str(subj_counter))
-                subject_translator.append([subj_element, URIRef(new_string)])
+                subject_translator.update({subj_element: URIRef(new_string)})
             else:
                 if '#' in subj_element:
-                    subject_translator.append([subj_element, URIRef("http://anonym-subj-url.anon#Subject" + str(subj_counter))])
+                    subject_translator.update({subj_element: URIRef(protocol + "anonym-subj-url.anon#Subject" + str(subj_counter))})
                 else:
-                    subject_translator.append([subj_element, URIRef("http://anonym-subj-url.anon/Subject" + str(subj_counter))])
+                    subject_translator.update({subj_element: URIRef(protocol + "anonym-subj-url.anon/Subject" + str(subj_counter))})
         elif standard_ns == False:
             if '_:' in subj_element.n3():
-                subject_translator.append([subj_element, BNode(subj_element)])
+                subject_translator.update({subj_element: BNode(subj_element)})
             else:
-                subject_translator.append([subj_element, Literal("Subject" + str(subj_counter), datatype=subj_element.datatype, lang=subj_element.language)])
+                subject_translator.update({subj_element: Literal("Subject" + str(subj_counter), datatype=subj_element.datatype, lang=subj_element.language)})
         subj_counter = subj_counter + 1
-
         standard_ns = False
+    return subject_translator
 
 # translates the predicates to generic predicates
-def predicat_to_generic_predicat(predicates, predicat_translator, namespace_translator, subject_translator, all_ns):
+def predicate_to_generic_predicat(predicates: list, namespace_translator: list, subject_translator: dict, all_ns:list)-> dict:
+    predicate_translator = {}
     predicat_counter = 0
     standard_ns = False
     for pred_element in predicates:
@@ -184,9 +194,10 @@ def predicat_to_generic_predicat(predicates, predicat_translator, namespace_tran
         for ns in all_ns:
             if (URIRef(pred_element) in Namespace(ns)) :
                 standard_ns = True
-                predicat_translator.append([pred_element, pred_element])
-
-        if ('http' in pred_element) and (standard_ns == False):
+                predicate_translator.update({pred_element: pred_element})
+        protocol = "http://" if ('http' in pred_element) else ""
+        protocol = "urn:" if ('urn:' in pred_element) else protocol        
+        if protocol != "" and (standard_ns == False):
             # check if URIRef is a known namespace
             is_namespace = False
             namespace_count = 0
@@ -198,46 +209,46 @@ def predicat_to_generic_predicat(predicates, predicat_translator, namespace_tran
 
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
-            if is_namespace == True:
+            if is_namespace:
 
                 # check if URI is known subject
                 is_subject = False
                 subject_value = ''
-                for element in subject_translator:
-                    if pred_element == element[0]:
-                        is_subject = True
-                        subject_value = element[1]
+                if pred_element in subject_translator:
+                    is_subject = True
+                    subject_value = subject_translator[pred_element]
 
-                if is_subject == True:
-                    predicat_translator.append([pred_element, URIRef(subject_value)])
+                if is_subject:
+                    predicate_translator.update({pred_element: URIRef(subject_value)})
                 else:
                     new_string = str(namespace_translator[namespace_count][1][1] + 'Predicate' + str(predicat_counter))
-                    predicat_translator.append([pred_element, URIRef(new_string)])
+                    predicate_translator.update({pred_element: URIRef(new_string)})
             else:
                 if '#' in pred_element:
-                    predicat_translator.append([pred_element, URIRef("http://anonym-pred-url.anon#Predicate" + str(predicat_counter))])
+                    predicate_translator.update({pred_element: URIRef(protocol + "anonym-pred-url.anon#Predicate" + str(predicat_counter))})
                 else:
-                    predicat_translator.append([pred_element, URIRef("http://anonym-pred-url.anon/Predicate" + str(predicat_counter))])
-        elif standard_ns == False:
-            predicat_translator.append([pred_element, Literal("Predicate" + str(predicat_counter))])
+                    predicate_translator.update({pred_element: URIRef(protocol + "anonym-pred-url.anon/Predicate" + str(predicat_counter))})
+        elif not standard_ns:
+            predicate_translator.update({pred_element: Literal("Predicate" + str(predicat_counter))})
         predicat_counter = predicat_counter + 1
 
         standard_ns = False
-
+    return predicate_translator
 # translates the objects to generic objects
-def object_to_generic_object(objects, object_translator, namespace_translator, subject_translator, predicat_translator, all_ns):
+def object_to_generic_object(objects, namespace_translator, subject_translator, predicat_translator, all_ns):
     object_counter = 0
-
+    object_translator = {}
     for obj_element in objects:
         # check if namespace standard namespace
         standard_ns = False
         for ns in all_ns:
             if (URIRef(obj_element) in Namespace(ns)) :
                 standard_ns = True
-                object_translator.append([obj_element, obj_element])
+                object_translator.update({obj_element: obj_element})
                 break
-
-        if ('http' in obj_element) and (standard_ns == False):
+        protocol = "http://" if ('http' in obj_element) else ""
+        protocol = "urn:" if ('urn:' in obj_element) else protocol  
+        if protocol != "" and not standard_ns:
 
             # check if URIRef is a known namespace
             is_namespace = False
@@ -246,64 +257,62 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
                 if URIRef(obj_element) in Namespace(element[0][1]):
                     is_namespace = True
                     break
-                namespace_count = namespace_count +1
+                namespace_count += 1
 
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
-            if is_namespace == True:
+            if is_namespace:
 
                 # check if URI is known subject
-                is_subject = False
-                subject_value = ''
-                for element in subject_translator:
-                    if obj_element == element[0]:
-                        is_subject = True
-                        subject_value = element[1]
+                translationValue = ''
+                if obj_element in subject_translator:
+                    translationValue = subject_translator[obj_element]
 
                 # check if URI is known subject
-                is_predicat = False
-                predicate_value = ''
-                for element in predicat_translator:
-                    if obj_element == element[0]:
-                        is_predicat = True
-                        is_subject = False
-                        predicate_value = element[1]
+                elif obj_element in predicat_translator:
+                    translationValue = predicat_translator[obj_element]
 
-                if is_subject == True:
-                    object_translator.append([obj_element, URIRef(subject_value)])
-                elif is_predicat == True:
-                    object_translator.append([obj_element, URIRef(predicate_value)])
+                if translationValue != '':
+                    object_translator.update({obj_element: URIRef(translationValue)})
                 else:
                     new_string = str(namespace_translator[namespace_count][1][1] + 'Object' + str(object_counter))
-                    object_translator.append([obj_element, URIRef(new_string)])
+                    object_translator.update({obj_element: URIRef(new_string)})
             else:
                 if '#' in obj_element:
-                    object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon#Object" + str(object_counter))])
+                    object_translator.update({obj_element: URIRef(protocol + "anonym-obj-url.anon#Object" + str(object_counter))})
                 else:
-                    object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon/Object" + str(object_counter))])
-        elif standard_ns == False:
+                    object_translator.update({obj_element: URIRef(protocol + "anonym-obj-url.anon/Object" + str(object_counter))})
+        elif not standard_ns:
             if type(obj_element) == rdflib.Literal:
                 if(obj_element.isdigit()):
-                    object_translator.append([obj_element, obj_element])
+                    object_translator.update({obj_element: obj_element})
                 else: 
-                    object_translator.append([obj_element, Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)])
+                    object_translator.update({obj_element: Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)})
             #     object_translator.append([obj_element, obj_element])
             elif type(obj_element) == rdflib.BNode:
-                object_translator.append([obj_element, BNode(obj_element)])
+                object_translator.update({obj_element: BNode(obj_element)})
             else:
-                object_translator.append([obj_element, obj_element])
-        elif standard_ns == True and type(obj_element) == rdflib.term.Literal:
-            object_translator.append([obj_element, Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)])
-        object_counter = object_counter + 1
-
+                object_translator.update({obj_element: obj_element})
+        elif standard_ns and type(obj_element) == rdflib.term.Literal:
+            object_translator.update({obj_element: Literal("Object" + str(object_counter), datatype=obj_element.datatype, lang=obj_element.language)})
+        object_counter += 1
         standard_ns = False
+    return object_translator
 
-# Removes the old triple and adds the anonymized triple to the graph
-def change_graph(g,subject_translator, predicate_translator, object_translator):
-    subject_translation_dict = {element[0]: element [1] for element in subject_translator}
-    predicate_translation_dict = {element[0]: element [1] for element in predicate_translator}
-    object_translation_dict = {element[0]: element [1] for element in object_translator}
+
+def change_graph(g: rdflib.Graph, subject_translator: dict, predicate_translator: dict, object_translator: dict)-> rdflib.Graph:
+    """Removes the old triple and adds the anonymized triple to the graph
+
+    Args:
+        g (rdflib.Graph): The original graph with the non-translated values
+        subject_translator (dict): a dict containing original and translated values for subjects
+        predicate_translator (dict): a dict containing original and translated values for predicates
+        object_translator (dict): a dict containing original and translated values for objects
+
+    Returns:
+        rdflib.Graph: the new, translated graph.
+    """
     new_g = rdflib.Graph(store="SimpleMemory")
-    for s,p,o in g:
-        new_g.add((subject_translation_dict[s], predicate_translation_dict[p], object_translation_dict[o]))
+    for s, p, o in g:
+        new_g.add((subject_translator[s], predicate_translator[p], object_translator[o]))
     return new_g

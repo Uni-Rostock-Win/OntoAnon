@@ -3,7 +3,7 @@ from tkinter import messagebox
 from tkinter.filedialog import askopenfilename, asksaveasfile
 from rdflib.util import guess_format
 
-import anonymization, time
+import anonymization
 
 # choosing the ontology file
 def choose_open_file():

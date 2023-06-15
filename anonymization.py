@@ -1,13 +1,15 @@
 from tkinter import messagebox
 
-import rdflib
+import rdflib, time
 from rdflib import Graph, Literal, URIRef, BNode
 from rdflib.namespace import Namespace
 
 
 def anonymize(filename, fileformat, anony_path, dict_path):
     # Create a Graph
-    g = Graph()
+    start_time = time.time()
+    g = Graph(store="SimpleMemory")
+    
     all_ns = [ns for ns in rdflib.namespace._NAMESPACE_PREFIXES_RDFLIB.values()] + [str(ns) for ns in rdflib.namespace._NAMESPACE_PREFIXES_CORE.values()]
 
     try:
@@ -45,7 +47,7 @@ def anonymize(filename, fileformat, anony_path, dict_path):
     translator.extend(object_translator)
 
     # Replaces the subjects, predicates and objects in the graph with the anonymized elements
-    change_graph(g,subject_translator,predicat_translator,object_translator)
+    g = change_graph(g,subject_translator,predicat_translator,object_translator)
 
     # Saving the anonymized graph to the selected file
     #new_graph = g.serialize(format=fileformat)
@@ -61,9 +63,11 @@ def anonymize(filename, fileformat, anony_path, dict_path):
         else: outputTranslator += ("\n" + str(item[0]) + " => " + str(item[1]))
     with open(dict_path, 'w') as fp:
         fp.write(outputTranslator)
-
+    end_time = time.time()
+    execution_time = int(end_time - start_time)
+    
     # Showing a message that the process is finished.
-    messagebox.showinfo("System-Message", "Anonymization is finished.")
+    messagebox.showinfo("System-Message", f"Anonymization is finished.\nExecution time: {execution_time} seconds")
 
 # identifying the elements of a ontology graph
 def identify_elements(g):
@@ -278,8 +282,6 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
                 else:
                     object_translator.append([obj_element, URIRef("http://anonym-obj-url.anon/Object" + str(object_counter))])
         elif standard_ns == False:
-            if '"' in obj_element.n3() and '<' in obj_element.n3() and type(obj_element) != rdflib.Literal:
-                print("test")
             if type(obj_element) == rdflib.Literal:
                 if(obj_element.isdigit()):
                     object_translator.append([obj_element, obj_element])
@@ -297,10 +299,11 @@ def object_to_generic_object(objects, object_translator, namespace_translator, s
         standard_ns = False
 
 # Removes the old triple and adds the anonymized triple to the graph
-def change_graph(g,subject_translator,predicat_translator,object_translator):
-    for subj in subject_translator:
-        for pred in predicat_translator:
-            for obj in object_translator:
-                if (subj[0], pred[0], obj[0]) in g:
-                    g.remove((subj[0], pred[0], obj[0]))
-                    g.add((subj[1], pred[1], obj[1]))
+def change_graph(g,subject_translator, predicate_translator, object_translator):
+    subject_translation_dict = {element[0]: element [1] for element in subject_translator}
+    predicate_translation_dict = {element[0]: element [1] for element in predicate_translator}
+    object_translation_dict = {element[0]: element [1] for element in object_translator}
+    new_g = rdflib.Graph(store="SimpleMemory")
+    for s,p,o in g:
+        new_g.add((subject_translation_dict[s], predicate_translation_dict[p], object_translation_dict[o]))
+    return new_g

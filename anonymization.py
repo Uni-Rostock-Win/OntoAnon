@@ -4,13 +4,16 @@ import rdflib, time
 from rdflib import Graph, Literal, URIRef, BNode
 from rdflib.namespace import Namespace
 
+predefined_ns = [ns for ns in rdflib.namespace._NAMESPACE_PREFIXES_RDFLIB.values()] + [ns for ns in rdflib.namespace._NAMESPACE_PREFIXES_CORE.values()]
+predefined_ns.append(rdflib.Namespace("http://www.w3.org/2003/11/swrl#")) # This one was missing
 
-def anonymize(filename, fileformat, anony_path, dict_path):
+def anonymize(filename, fileformat, anony_path, dict_path, all_ns):
     # Create a Graph
     start_time = time.time()
     g = Graph(store="SimpleMemory")
     
-    all_ns = [ns for ns in rdflib.namespace._NAMESPACE_PREFIXES_RDFLIB.values()] + [str(ns) for ns in rdflib.namespace._NAMESPACE_PREFIXES_CORE.values()]
+
+
 
     try:
         # Parse in an ontologie file
@@ -57,7 +60,8 @@ def anonymize(filename, fileformat, anony_path, dict_path):
     # Saves the translation dictionary
     outputTranslator = ""
     for k,v in translator.items():
-        outputTranslator += ("\n" + str(k) + " => " + str(v))
+        if not isinstance(k, rdflib.BNode):
+            outputTranslator += ("\n" + str(k) + " => " + str(v))
     with open(dict_path, 'w', encoding="utf-8") as fp:
         fp.write(outputTranslator)
     end_time = time.time()
@@ -84,24 +88,12 @@ def identify_elements(g):
         subjects.append(subj)
         predicates.append(pred)
         objects.append(obj)
-        if (subj, pred, obj) not in g:
-            raise Exception("It better be!")
 
     # delete doubles
     namespaces = list(dict.fromkeys(namespaces))
     subjects = list(dict.fromkeys(subjects))
     predicates = list(dict.fromkeys(predicates))
     objects = list(dict.fromkeys(objects))
-
-    # controll results while development
-    #print('namespaces: ')
-    #print(namespaces)
-    #print('subjects: ')
-    #print(subjects)
-    #print('predicates: ')
-    #print(predicates)
-    #print('objects: ')
-    #print(objects)
     return namespaces, objects, predicates, subjects
 
 # translates the namespaces to generic namespaces
@@ -207,22 +199,21 @@ def predicate_to_generic_predicat(predicates: list, namespace_translator: list, 
                     break
                 namespace_count = namespace_count +1
 
+            # check if URI is known subject
+            is_subject = False
+            subject_value = ''
+            if pred_element in subject_translator:
+                is_subject = True
+                subject_value = subject_translator[pred_element]
+
+            if is_subject:
+                predicate_translator.update({pred_element: URIRef(subject_value)})
+
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
-            if is_namespace:
-
-                # check if URI is known subject
-                is_subject = False
-                subject_value = ''
-                if pred_element in subject_translator:
-                    is_subject = True
-                    subject_value = subject_translator[pred_element]
-
-                if is_subject:
-                    predicate_translator.update({pred_element: URIRef(subject_value)})
-                else:
-                    new_string = str(namespace_translator[namespace_count][1][1] + 'Predicate' + str(predicat_counter))
-                    predicate_translator.update({pred_element: URIRef(new_string)})
+            elif is_namespace:
+                new_string = str(namespace_translator[namespace_count][1][1] + 'Predicate' + str(predicat_counter))
+                predicate_translator.update({pred_element: URIRef(new_string)})
             else:
                 if '#' in pred_element:
                     predicate_translator.update({pred_element: URIRef(protocol + "anonym-pred-url.anon#Predicate" + str(predicat_counter))})
@@ -259,24 +250,22 @@ def object_to_generic_object(objects, namespace_translator, subject_translator, 
                     break
                 namespace_count += 1
 
+            # check if URI is known subject
+            translationValue = ''
+            if obj_element in subject_translator:
+                translationValue = subject_translator[obj_element]
+
+            # check if URI is known subject
+            elif obj_element in predicat_translator:
+                translationValue = predicat_translator[obj_element]
+
+            if translationValue != '':
+                object_translator.update({obj_element: URIRef(translationValue)})
             # if URIRef is a known namespace translate it accordingly
             # if not translate it as normal URIRef
-            if is_namespace:
-
-                # check if URI is known subject
-                translationValue = ''
-                if obj_element in subject_translator:
-                    translationValue = subject_translator[obj_element]
-
-                # check if URI is known subject
-                elif obj_element in predicat_translator:
-                    translationValue = predicat_translator[obj_element]
-
-                if translationValue != '':
-                    object_translator.update({obj_element: URIRef(translationValue)})
-                else:
-                    new_string = str(namespace_translator[namespace_count][1][1] + 'Object' + str(object_counter))
-                    object_translator.update({obj_element: URIRef(new_string)})
+            elif is_namespace:
+                new_string = str(namespace_translator[namespace_count][1][1] + 'Object' + str(object_counter))
+                object_translator.update({obj_element: URIRef(new_string)})
             else:
                 if '#' in obj_element:
                     object_translator.update({obj_element: URIRef(protocol + "anonym-obj-url.anon#Object" + str(object_counter))})

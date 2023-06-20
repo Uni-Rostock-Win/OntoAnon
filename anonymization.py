@@ -146,7 +146,7 @@ def subject_to_generic_subject(subjects:list, namespace_translator:list, all_ns:
             protocol = "http://" if ('http' in subj_element) else ""
             protocol = "urn:" if ('urn:' in subj_element) else protocol
         # check if subject contains an URIRef, if not translate it as normal Literal
-        if protocol != "" and (standard_ns == False):
+        if protocol != "" and not standard_ns and not isinstance(subj_element, rdflib.Literal):
 
             # check if URIRef is a known namespace
             is_namespace = False
@@ -189,7 +189,7 @@ def predicate_to_generic_predicat(predicates: list, namespace_translator: list, 
                 predicate_translator.update({pred_element: pred_element})
         protocol = "http://" if ('http' in pred_element) else ""
         protocol = "urn:" if ('urn:' in pred_element) else protocol        
-        if protocol != "" and (standard_ns == False):
+        if protocol != "" and not standard_ns and not isinstance(pred_element, rdflib.Literal):
             # check if URIRef is a known namespace
             is_namespace = False
             namespace_count = 0
@@ -239,7 +239,7 @@ def object_to_generic_object(objects, namespace_translator, subject_translator, 
                 break
         protocol = "http://" if ('http' in obj_element) else ""
         protocol = "urn:" if ('urn:' in obj_element) else protocol  
-        if protocol != "" and not standard_ns:
+        if protocol != "" and not standard_ns and not isinstance(obj_element, rdflib.Literal):
 
             # check if URIRef is a known namespace
             is_namespace = False

@@ -9,136 +9,137 @@ import rdflib
 import anonymization
 
 
-# choosing the ontology file
-def choose_open_file():
-    filename = askopenfilename(title="Ontology File")
-    onto_text.delete(0, END)
-    onto_text.insert(0, filename)
-
-# choosing where to store the anonymized ontology
-def choose_anon_file():
-        path = asksaveasfile(title="Anonymized File")
-        anon_text.delete(0, END)
-        anon_text.insert(0, path)
-        start = "<_io.TextIOWrapper name='"
-        end = "' mode='w' encoding='cp1252'>"
-        filename = anon_filename.get()[anon_filename.get().find(start)+len(start):anon_filename.get().rfind(end)]
-        anon_text.delete(0, END)
-        anon_text.insert(0, filename)
-
-# choosing where to store the dictionary file
-def choose_dict_file():
-        filename = asksaveasfile(title="Dictionary File")
-        dict_text.delete(0, END)
-        dict_text.insert(0, filename)
-        start = "<_io.TextIOWrapper name='"
-        end = "' mode='w' encoding='cp1252'>"
-        filename = dict_filename.get()[dict_filename.get().find(start)+len(start):dict_filename.get().rfind(end)]
-        dict_text.delete(0, END)
-        dict_text.insert(0, filename)
-
-def choose_namespaces():
-    global SELECTED_NS
-    values = [str(val) for val in anonymization.predefined_ns]
-    values += [str(e) for e in SELECTED_NS if str(e) not in values]
-    def add_value():
-        global SELECTED_NS
-        new_value = new_value_entry.get()
-        if new_value:
-            values.append(new_value)
-            listbox.insert(tk.END, new_value) 
-            listbox.selection_set(tk.END, tk.END)
-            new_value_entry.delete(0, tk.END)
-            SELECTED_NS.append(new_value)
-        else:
-            messagebox.showwarning("Warning", "Please enter a value.")
-
-    def select_all():
-        listbox.select_set(0, tk.END)
-
-    def deselect_all():
-        listbox.selection_clear(0, tk.END)
-
-    def submit_selection():
-        global SELECTED_NS
-        SELECTED_NS = [listbox.get(index) for index in listbox.curselection()]
-        predefinied_NS = [ns for ns in  anonymization.predefined_ns if str(ns) in SELECTED_NS]
-        custom_NS = [rdflib.Namespace(ns) for ns in SELECTED_NS if ns not in predefinied_NS]
-        SELECTED_NS = predefinied_NS + custom_NS
-        root.destroy()
-
-    
-    root = tk.Tk()
-    root.geometry("500x400")
-    root.title("Value Selection")
-
-    # Frame for the listbox and scrollbar
-    frame = ttk.Frame(root)
-    frame.pack(pady=2, padx=2, fill=tk.BOTH)
-
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(frame)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-    # Listbox
-    listbox = tk.Listbox(frame, width=300, selectmode=tk.MULTIPLE, yscrollcommand=scrollbar.set)
-    i = 0
-    for value in values:
-        listbox.insert(tk.END, value)
-        if value in [str(element) for element in  SELECTED_NS]:
-            listbox.select_set(tk.END, tk.END)
-            # listbox.activate(tk.END)
-            i += 1
-    listbox.pack(side=tk.LEFT, fill=tk.BOTH)
-    scrollbar.config(command=listbox.yview)
-    if len(SELECTED_NS) == 0:
-        select_all()
-    # Entry for adding new values
-    new_value_entry = ttk.Entry(root)
-    new_value_entry.pack(pady=5, fill=tk.X)
-
-    # Buttons
-    add_button = ttk.Button(root, text="Add Value", command=add_value)
-    add_button.pack(fill=tk.X)
-    select_all_button = ttk.Button(root, text="Select All", command=select_all)
-    select_all_button.pack(fill=tk.X, pady=5)
-    deselect_all_button = ttk.Button(root, text="Deselect All", command=deselect_all)
-    deselect_all_button.pack(fill=tk.X)
-    submit_button = ttk.Button(root, text="Submit", command=submit_selection)
-    submit_button.pack(fill=tk.X, pady=10)
-
-    root.mainloop()
-    
-
-# identifing the format of the ontology
-def identify_file_format():
-    """Identifies the file format of the ontology (e.g., turtle, rdf/xml)
-    """
-    try:
-        format = guess_format(onto_filename.get())
-        format_text.delete(0,END)
-        format_text.insert(0,format)
-    except Exception:
-        format_text.delete(0,END)
-        format_text.insert(0,'The file is missing, an url or not supported.')
-
-
-def anonymize():
-    """calling the anonymization method
-    """
-    global SELECTED_NS
-    if len(SELECTED_NS) == 0:
-        SELECTED_NS = anonymization.predefined_ns
-    if (onto_filename.get() == "" or onto_format.get() == "" or anon_filename.get() == "" or dict_filename.get() == "" ):
-        messagebox.showerror("Error", "Not all values set!")
-    else:
-        anonymization.anonymize(onto_filename.get(), onto_format.get(), anon_filename.get(), dict_filename.get(), SELECTED_NS)
 
 
 
 def start_gui():
     """Calls the GUI to be started
     """
+    # choosing the ontology file
+    def choose_open_file():
+        filename = askopenfilename(title="Ontology File")
+        onto_text.delete(0, END)
+        onto_text.insert(0, filename)
+
+    # choosing where to store the anonymized ontology
+    def choose_anon_file():
+            path = asksaveasfile(title="Anonymized File")
+            anon_text.delete(0, END)
+            anon_text.insert(0, path)
+            start = "<_io.TextIOWrapper name='"
+            end = "' mode='w' encoding='cp1252'>"
+            filename = anon_filename.get()[anon_filename.get().find(start)+len(start):anon_filename.get().rfind(end)]
+            anon_text.delete(0, END)
+            anon_text.insert(0, filename)
+
+    # choosing where to store the dictionary file
+    def choose_dict_file():
+            filename = asksaveasfile(title="Dictionary File")
+            dict_text.delete(0, END)
+            dict_text.insert(0, filename)
+            start = "<_io.TextIOWrapper name='"
+            end = "' mode='w' encoding='cp1252'>"
+            filename = dict_filename.get()[dict_filename.get().find(start)+len(start):dict_filename.get().rfind(end)]
+            dict_text.delete(0, END)
+            dict_text.insert(0, filename)
+
+    def choose_namespaces():
+        global SELECTED_NS
+        values = [str(val) for val in anonymization.predefined_ns]
+        values += [str(e) for e in SELECTED_NS if str(e) not in values]
+        def add_value():
+            global SELECTED_NS
+            new_value = new_value_entry.get()
+            if new_value:
+                values.append(new_value)
+                listbox.insert(tk.END, new_value) 
+                listbox.selection_set(tk.END, tk.END)
+                new_value_entry.delete(0, tk.END)
+                SELECTED_NS.append(new_value)
+            else:
+                messagebox.showwarning("Warning", "Please enter a value.")
+
+        def select_all():
+            listbox.select_set(0, tk.END)
+
+        def deselect_all():
+            listbox.selection_clear(0, tk.END)
+
+        def submit_selection():
+            global SELECTED_NS
+            SELECTED_NS = [listbox.get(index) for index in listbox.curselection()]
+            predefinied_NS = [ns for ns in  anonymization.predefined_ns if str(ns) in SELECTED_NS]
+            custom_NS = [rdflib.Namespace(ns) for ns in SELECTED_NS if ns not in predefinied_NS]
+            SELECTED_NS = predefinied_NS + custom_NS
+            root.destroy()
+
+        
+        root = tk.Tk()
+        root.geometry("500x400")
+        root.title("Value Selection")
+
+        # Frame for the listbox and scrollbar
+        frame = ttk.Frame(root)
+        frame.pack(pady=2, padx=2, fill=tk.BOTH)
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Listbox
+        listbox = tk.Listbox(frame, width=300, selectmode=tk.MULTIPLE, yscrollcommand=scrollbar.set)
+        i = 0
+        for value in values:
+            listbox.insert(tk.END, value)
+            if value in [str(element) for element in  SELECTED_NS]:
+                listbox.select_set(tk.END, tk.END)
+                # listbox.activate(tk.END)
+                i += 1
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH)
+        scrollbar.config(command=listbox.yview)
+        if len(SELECTED_NS) == 0:
+            select_all()
+        # Entry for adding new values
+        new_value_entry = ttk.Entry(root)
+        new_value_entry.pack(pady=5, fill=tk.X)
+
+        # Buttons
+        add_button = ttk.Button(root, text="Add Value", command=add_value)
+        add_button.pack(fill=tk.X)
+        select_all_button = ttk.Button(root, text="Select All", command=select_all)
+        select_all_button.pack(fill=tk.X, pady=5)
+        deselect_all_button = ttk.Button(root, text="Deselect All", command=deselect_all)
+        deselect_all_button.pack(fill=tk.X)
+        submit_button = ttk.Button(root, text="Submit", command=submit_selection)
+        submit_button.pack(fill=tk.X, pady=10)
+
+        root.mainloop()
+        
+
+    # identifing the format of the ontology
+    def identify_file_format():
+        """Identifies the file format of the ontology (e.g., turtle, rdf/xml)
+        """
+        try:
+            format = guess_format(onto_filename.get())
+            format_text.delete(0,END)
+            format_text.insert(0,format)
+        except Exception:
+            format_text.delete(0,END)
+            format_text.insert(0,'The file is missing, an url or not supported.')
+
+
+    def anonymize():
+        """calling the anonymization method
+        """
+        global SELECTED_NS
+        if len(SELECTED_NS) == 0:
+            SELECTED_NS = anonymization.predefined_ns
+        if (onto_filename.get() == "" or onto_format.get() == "" or anon_filename.get() == "" or dict_filename.get() == "" ):
+            messagebox.showerror("Error", "Not all values set!")
+        else:
+            anonymization.anonymize(onto_filename.get(), onto_format.get(), anon_filename.get(), dict_filename.get(), SELECTED_NS)
+
     global SELECTED_NS
     if "SELECTED_NS" not in globals():
         SELECTED_NS = []
